@@ -52,7 +52,7 @@ async def check_score(student: Student):
     features = list(student_dict.values()) + gender_binar + race_ethnicity_binar + parent_binar + lunch_binar + test_binar
     scaled = scaler.transform([features])
     predict = model.predict(scaled)[0]
-    return {'Прогнозируемый бал по writing score': {round(predict, 2)}}
+    return {'Прогнозируемый бал по writing score': {round(predict, 2)}} # Словарь — стандарт для REST API, потому что JSON легко парсится на любом языке.
 
 if __name__ == '__main__':
     uvicorn.run(student_app, host='127.0.0.1', port=8000)
