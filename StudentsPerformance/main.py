@@ -7,8 +7,8 @@ from pathlib import Path
 
 BASE_DIR = Path(__file__).parent
 
-model = joblib.load(BASE_DIR / 'model.pkl')
-scaler = joblib.load(BASE_DIR / 'scaler.pkl')
+model = joblib.load(BASE_DIR / 'model_StudentsPerformance.pkl')
+scaler = joblib.load(BASE_DIR / 'scaler_StudentsPerformance.pkl')
 
 student_app = FastAPI()
 
