@@ -1,8 +1,8 @@
-from fastapi import FastAPI
 from pydantic import BaseModel
-import joblib
-import uvicorn
+from fastapi import FastAPI
 from pathlib import Path
+import uvicorn
+import joblib
 
 
 BASE_DIR = Path(__file__).parent
@@ -25,6 +25,11 @@ class Student(BaseModel):
 @student_app.post('/predict/')
 async def check_score(student: Student):
     student_dict = dict(student)
+
+    math_score = student_dict['math_score']
+    reading_score = student_dict['reading_score']
+    avarage_score = round((math_score + reading_score) / 2, 2)
+    three_subjects = math_score + reading_score
 
     new_gender = student_dict.pop('gender')
     gender_binar = [1 if new_gender == 'male' else 0]
@@ -52,22 +57,17 @@ async def check_score(student: Student):
     new_test = student_dict.pop('test')
     test_binar = [1 if new_test == 'none' else 0]
 
-    features = list(student_dict.values()) + gender_binar + race_ethnicity_binar + parent_binar + lunch_binar + test_binar
+    features = (
+        [math_score, reading_score, avarage_score, three_subjects]
+        + gender_binar
+        + race_ethnicity_binar
+        + parent_binar
+        + lunch_binar
+        + test_binar
+    )
     scaled = scaler.transform([features])
     predict = model.predict(scaled)[0]
-    return {'Прогнозируемый бал по writing score': {round(predict, 2)}} # Словарь — стандарт для REST API, потому что JSON легко парсится на любом языке.
+    return {'Прогнозируемый бал по writing score': round(predict, 2)}
 
 if __name__ == '__main__':
     uvicorn.run(student_app, host='127.0.0.1', port=8000)
-
-
-# для теста
-# {
-#   "gender": "female",
-#   "race_ethnicity": "group B",
-#   "parent": "bachelor's degree",
-#   "lunch": "standard",
-#   "test": "none",
-#   "math_score": 72,
-#   "reading_score": 72
-# }

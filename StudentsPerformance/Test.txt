@@ -1,0 +1,71 @@
+{
+  "gender": "female",
+  "race_ethnicity": "group B",
+  "parent": "bachelor's degree",
+  "lunch": "standard",
+  "test": "none",
+  "math_score": 72,
+  "reading_score": 72
+}
+{
+  "Прогнозируемый бал по writing score": 95
+}
+
+
+
+{
+  "gender": "male",
+  "race_ethnicity": "group C",
+  "parent": "high school",
+  "lunch": "free/reduced",
+  "test": "none",
+  "math_score": 62,
+  "reading_score": 55
+}
+{
+  "Прогнозируемый бал по writing score": 55
+}
+
+
+
+{
+  "gender": "female",
+  "race_ethnicity": "group C",
+  "parent": "high school",
+  "lunch": "free/reduced",
+  "test": "completed",
+  "math_score": 59,
+  "reading_score": 71
+}
+{
+  "Прогнозируемый бал по writing score": 65
+}
+
+
+
+{
+  "gender": "female",
+  "race_ethnicity": "group D",
+  "parent": "some college",
+  "lunch": "standard",
+  "test": "completed",
+  "math_score": 68,
+  "reading_score": 78
+}
+{
+  "Прогнозируемый бал по writing score": 77
+}
+
+
+{
+  "gender": "female",
+  "race_ethnicity": "group D",
+  "parent": "some college",
+  "lunch": "free/reduced",
+  "test": "none",
+  "math_score": 77,
+  "reading_score": 86
+}
+{
+  "Прогнозируемый бал по writing score": 86
+}
