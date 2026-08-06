@@ -1,78 +1,92 @@
 # StudentsPerformance/main.py
 
-from pydantic import BaseModel
-from fastapi import FastAPI
 from pathlib import Path
-import pandas as pd
-import uvicorn
+from contextlib import asynccontextmanager
+from fastapi import FastAPI
+from pydantic import BaseModel, field_validator
 import joblib
-
+import uvicorn
 
 BASE_DIR = Path(__file__).parent
 
-model = joblib.load(BASE_DIR / 'model_StudentsPerformance.pkl')
-scaler = joblib.load(BASE_DIR / 'scaler_StudentsPerformance.pkl')
-
-student_app = FastAPI()
-
-FEATURE_ORDER = [
-    'math score', 'reading score', 'avarage_score', '3 subjects',
-    'gender_male',
-    'race/ethnicity_group B', 'race/ethnicity_group C',
-    'race/ethnicity_group D', 'race/ethnicity_group E',
-    "parental level of education_bachelor's degree",
-    'parental level of education_high school',
-    "parental level of education_master's degree",
-    'parental level of education_some college',
-    'parental level of education_some high school',
-    'lunch_standard',
-    'test preparation course_none',
+RACE_GROUPS = ["A", "B", "C", "D", "E"]
+EDUCATION_LEVELS = [
+    "some high school", "high school", "some college",
+    "associate's degree", "bachelor's degree", "master's degree",
 ]
 
 
+# ── Lifespan ───────────────────────────────────────────────────────────────────
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    app.state.model  = joblib.load(BASE_DIR / "model_lin_StudentsPerformance.pkl")
+    app.state.scaler = joblib.load(BASE_DIR / "scaler_StudentsPerformance.pkl")
+    yield
+
+
+app = FastAPI(title="Writing Score Predictor", lifespan=lifespan)
+
+
+# ── Schema ─────────────────────────────────────────────────────────────────────
 class Student(BaseModel):
-    gender: str
-    race_ethnicity: str
-    parent: str
-    lunch: str
-    test: str
-    math_score: float
-    reading_score: float
+    gender:         str
+    race_ethnicity: str          # "group A".."group E"
+    parent:         str          # уровень образования родителя
+    lunch:          str
+    test:           str          # "none" | "completed"
+    math_score:     float
+    reading_score:  float
+
+    @field_validator("race_ethnicity")
+    @classmethod
+    def validate_race(cls, v: str) -> str:
+        letter = v.strip().upper().replace("GROUP ", "")
+        if letter not in RACE_GROUPS:
+            raise ValueError(f"race_ethnicity должен быть одним из group {RACE_GROUPS}")
+        return f"group {letter}"
+
+    @field_validator("parent")
+    @classmethod
+    def validate_parent(cls, v: str) -> str:
+        v = v.strip().lower()
+        if v not in EDUCATION_LEVELS:
+            raise ValueError(f"parent должен быть одним из: {EDUCATION_LEVELS}")
+        return v
 
 
-@student_app.post('/predict/')
-async def check_score(student: Student):
-    math_score = student.math_score
-    reading_score = student.reading_score
-    avarage_score = round((math_score + reading_score) / 2, 2)
-    three_subjects = math_score + reading_score
+# ── Utils ──────────────────────────────────────────────────────────────────────
+def build_features(s: Student) -> list[float]:
+    # Порядок строго повторяет features.columns.tolist() из ноутбука —
+    # без avarage_score и 3 subjects, они были удалены перед обучением.
+    return [
+        s.math_score,
+        s.reading_score,
+        1.0 if s.gender.strip().lower() == "male" else 0.0,
+        1.0 if s.race_ethnicity == "group B" else 0.0,
+        1.0 if s.race_ethnicity == "group C" else 0.0,
+        1.0 if s.race_ethnicity == "group D" else 0.0,
+        1.0 if s.race_ethnicity == "group E" else 0.0,
+        1.0 if s.parent == "bachelor's degree" else 0.0,
+        1.0 if s.parent == "high school" else 0.0,
+        1.0 if s.parent == "master's degree" else 0.0,
+        1.0 if s.parent == "some college" else 0.0,
+        1.0 if s.parent == "some high school" else 0.0,
+        1.0 if s.lunch.strip().lower() == "standard" else 0.0,
+        1.0 if s.test.strip().lower() == "none" else 0.0,
+    ]
 
-    row = {
-        'math score': math_score,
-        'reading score': reading_score,
-        'avarage_score': avarage_score,
-        '3 subjects': three_subjects,
-        'gender_male': 1 if student.gender == 'male' else 0,
-        'race/ethnicity_group B': 1 if student.race_ethnicity == 'group B' else 0,
-        'race/ethnicity_group C': 1 if student.race_ethnicity == 'group C' else 0,
-        'race/ethnicity_group D': 1 if student.race_ethnicity == 'group D' else 0,
-        'race/ethnicity_group E': 1 if student.race_ethnicity == 'group E' else 0,
-        "parental level of education_bachelor's degree": 1 if student.parent == "bachelor's degree" else 0,
-        'parental level of education_high school': 1 if student.parent == 'high school' else 0,
-        "parental level of education_master's degree": 1 if student.parent == "master's degree" else 0,
-        'parental level of education_some college': 1 if student.parent == 'some college' else 0,
-        'parental level of education_some high school': 1 if student.parent == 'some high school' else 0,
-        'lunch_standard': 1 if student.lunch == 'standard' else 0,
-        'test preparation course_none': 1 if student.test == 'none' else 0,
+
+# ── Endpoint ───────────────────────────────────────────────────────────────────
+@app.post("/predict")
+def predict(student: Student):
+    features = build_features(student)
+    scaled   = app.state.scaler.transform([features])
+    score    = float(app.state.model.predict(scaled)[0])
+
+    return {
+        "predicted_writing_score": round(score, 2),
     }
 
-    features_df = pd.DataFrame([row])[FEATURE_ORDER]
 
-    scaled = scaler.transform(features_df)
-    predict = model.predict(scaled)[0]
-
-    return {'Прогнозируемый бал по writing score': round(predict, 2)}
-
-
-if __name__ == '__main__':
-    uvicorn.run(student_app, host='127.0.0.1', port=8000)
+if __name__ == "__main__":
+    uvicorn.run("main:app", host="127.0.0.1", port=8000, reload=False)
